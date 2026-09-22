@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
       - name: Limpiar
         run: rm -rf android www
       - name: Preparar
@@ -30,10 +30,7 @@ jobs:
         run: npx cap add android
       - name: Fix duplicado Kotlin
         run: |
-          echo "Arreglando duplicado kotlin..."
-          # Excluir los modulos viejos jdk7 y jdk8 que duplican clases
           sed -i "/^android {/i configurations {\n implementation {\n exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'\n exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'\n }\n}\n" android/app/build.gradle
-          cat android/app/build.gradle | tail -n 20
       - name: Build AAB
         run: cd android && chmod +x gradlew &&./gradlew bundleRelease
       - name: Guardar AAB
