@@ -1,0 +1,31 @@
+name: Crear AAB GOASalert
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Crear proyecto Android
+        run: |
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init GOASalert com.institutogoas.goasalert --web-dir=.
+          npx cap add android
+          npx cap copy
+      - name: Generar AAB
+        run: |
+          cd android
+          chmod +x gradlew
+         ./gradlew bundleRelease
+      - name: Guardar AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: goasalert-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
