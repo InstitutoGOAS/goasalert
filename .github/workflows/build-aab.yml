@@ -14,20 +14,12 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - name: Preparar Capacitor
-        run: |
-          npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init GOASalert com.institutogoas.goasalert --web-dir=.
+      - name: Preparar
+        run: npm init -y && npm install @capacitor/core @capacitor/cli @capacitor/android && npx cap init GOASalert com.institutogoas.goasalert --web-dir=.
       - name: Crear Android
-        run: |
-          npx cap add android
-          npx cap copy android
+        run: npx cap add android && npx cap copy android
       - name: Generar AAB
-        run: |
-          cd android
-          chmod +x gradlew
-         ./gradlew bundleRelease
+        run: cd android && chmod +x gradlew &&./gradlew bundleRelease
       - name: Guardar AAB
         uses: actions/upload-artifact@v4
         with:
