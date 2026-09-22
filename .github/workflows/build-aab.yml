@@ -15,9 +15,15 @@ jobs:
           distribution: temurin
           java-version: 17
       - name: Preparar
-        run: npm init -y && npm install @capacitor/core @capacitor/cli @capacitor/android && npx cap init GOASalert com.institutogoas.goasalert --web-dir=.
+        run: npm init -y || true
+      - name: Instalar Capacitor
+        run: npm install @capacitor/core @capacitor/cli @capacitor/android
+      - name: Iniciar proyecto
+        run: npx cap init GOASalert com.institutogoas.goasalert --web-dir=. || true
       - name: Crear Android
-        run: npx cap add android && npx cap copy android
+        run: npx cap add android || true
+      - name: Copiar web
+        run: npx cap copy android
       - name: Generar AAB
         run: cd android && chmod +x gradlew &&./gradlew bundleRelease
       - name: Guardar AAB
