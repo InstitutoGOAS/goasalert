@@ -14,14 +14,14 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - name: Limpiar restos anteriores
+      - name: Limpiar
         run: rm -rf android
       - name: Preparar
         run: npm init -y || true
       - name: Instalar Capacitor
         run: npm install @capacitor/core @capacitor/cli @capacitor/android
-      - name: Iniciar Capacitor
-        run: npx cap init GOASalert com.institutogoas.goasalert --web-dir=. || true
+      - name: Crear config manual
+        run: echo '{"appId":"com.institutogoas.goasalert","appName":"GOASalert","webDir":".","bundledWebRuntime":false}' > capacitor.config.json && cat capacitor.config.json
       - name: Add Android limpio
         run: npx cap add android
       - name: Copy y Sync
