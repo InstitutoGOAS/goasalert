@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GOASalert</title>
+<style>
+:root{--verde:#16482B;--dorado:#D4A65A}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--verde);color:white;min-height:100vh}
+#app{width:100%;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;transition:0.5s}
+.verde{background:#2E7D32}.amarillo{background:#F9A825;color:#000}.rojo{background:#C62828}
+.logo{width:120px;height:120px;background:white;border-radius:25px;display:flex;align-items:center;justify-content:center;font-size:60px;margin-bottom:15px}
+h1{font-size:32px;margin-bottom:5px}.sub{font-size:13px;opacity:0.8;margin-bottom:20px}
+.card{background:rgba(0,0,0,0.2);padding:15px;border-radius:15px;width:100%;max-width:350px;margin:10px 0}
+input[type=time]{padding:8px;border-radius:8px;border:none;margin:5px;font-size:16px}
+button{padding:12px 20px;border-radius:10px;border:none;font-weight:bold;margin:5px;cursor:pointer}
+.btn-verde{background:white;color:#2E7D32}.btn-amarillo{background:black;color:#F9A825}.btn-rojo{background:white;color:#C62828}
+.btn-save{background:var(--dorado);color:black;width:100%;margin-top:10px}
+.tarea{color:white;text-align:left;padding:8px;background:rgba(0,0,0,0.3);border-radius:8px;margin:5px 0}
+.footer{font-size:10px;opacity:0.6;margin-top:20px}
+.wake{position:fixed;bottom:5px;background:black;color:white;padding:5px 10px;border-radius:15px;font-size:10px}
+</style>
+</head>
+<body>
+<div id="app" class="verde">
+<div class="logo">🔔</div>
+<h1>GOASalert</h1>
+<div class="sub">Instituto GOAS - com.institutogoas.goasalert</div>
+<div class="card" id="estado">Esperando alertas...<br><small>Las 3 alarmas sonarán a pantalla completa</small></div>
+
+<div class="card">
+<strong>Editar horas:</strong><br>
+<input type="time" id="hV" value="08:00"> Verde Mañana<br>
+<input type="time" id="hA" value="14:30"> Amarillo Tarde<br>
+<input type="time" id="hR" value="21:30"> Rojo Noche<br>
+<button class="btn-save" onclick="guardar()">💾 Guardar Horas</button>
+</div>
+
+<div class="card">
+<button class="btn-verde" onclick="test('verde')">Test Verde 08:00</button>
+<button class="btn-amarillo" onclick="test('amarillo')">Test Amarillo 14:30</button>
+<button class="btn-rojo" onclick="test('rojo')">Test Rojo 21:30</button>
+</div>
+
+<div class="card" id="listaTareas"></div>
+<div class="footer">Desarrollador: InstitutoGOAS<br>Mantén pantalla encendida en Ajustes para modo noche</div>
+<div class="wake" id="wake">🌙 Activando pantalla siempre encendida...</div>
+</div>
+
+<audio id="audio" loop><source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" type="audio/ogg"></audio>
+
+<script>
+let horas = JSON.parse(localStorage.getItem('hGOAS')||'{"v":"08:00","a":"14:30","r":"21:30"}');
+document.getElementById('hV').value=horas.v;document.getElementById('hA').value=horas.a;document.getElementById('hR').value=horas.r;
+let tareas = JSON.parse(localStorage.getItem('tGOAS')||'[]');
+let wakelock=null;
+async function wake(){try{if('wakeLock' in navigator){wakelock=await navigator.wakeLock.request('screen');document.getElementById('wake').innerText='🌙 Modo noche activo - pantalla siempre encendida'}}catch(e){document.getElementById('wake').innerText='🌙 Activa "Mantener pantalla encendida" en tu móvil'}}wake();
+document.addEventListener('visibilitychange',()=>{if(wakelock!==null&&document.visibilityState==='visible')wake()});
+
+function guardar(){horas={v:document.getElementById('hV').value,a:document.getElementById('hA').value,r:document.getElementById('hR').value};localStorage.setItem('hGOAS',JSON.stringify(horas));alert('Horas guardadas. En Android sonará a pantalla completa con el móvil bloqueado.');}
+
+function test(t){
+ const app=document.getElementById('app');app.className=t;let msg='';
+ if(t==='verde'){msg='☀️ MAÑANA - Tareas del día';app.innerHTML+=`<div class="card"><input id="nTarea" placeholder="Nueva tarea..."><button onclick="addTarea()">Añadir</button></div>`}
+ if(t==='amarillo'){msg='🌤️ TARDE - Revisión de tareas'}
+ if(t==='rojo'){msg='🌙 NOCHE - ¿Qué te queda?';setTimeout(()=>{if(confirm('¿Quieres pasar lo pendiente a mañana?')){alert('Pasado a mañana ✅')}else{alert('Felicidades... todo completado 🎉');tareas=[];localStorage.setItem('tGOAS','[]');render()}} ,2000)}
+ document.getElementById('estado').innerHTML=`<h2>${msg}</h2><button onclick="location.reload()">Cerrar alerta</button>`;
+ document.getElementById('audio').play();render();
+ setTimeout(()=>{document.getElementById('audio').pause();},8000);
+}
+function addTarea(){const v=document.getElementById('nTarea').value;if(!v)return;tareas.push(v);localStorage.setItem('tGOAS',JSON.stringify(tareas));render();document.getElementById('nTarea').value='';}
+function render(){const c=document.getElementById('listaTareas');if(!c)return;c.innerHTML='<strong>Tareas:</strong>'+tareas.map(t=>`<div class="tarea">• ${t}</div>`).join('')||'<small>Sin tareas</small>';}
+render();
+</script>
+</body>
+</html>
