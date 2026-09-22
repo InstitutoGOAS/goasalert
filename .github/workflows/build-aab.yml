@@ -15,17 +15,23 @@ jobs:
           distribution: temurin
           java-version: 17
       - name: Limpiar
-        run: rm -rf android
+        run: rm -rf android www
       - name: Preparar
         run: npm init -y || true
       - name: Instalar Capacitor
         run: npm install @capacitor/core @capacitor/cli @capacitor/android
-      - name: Crear config manual
-        run: echo '{"appId":"com.institutogoas.goasalert","appName":"GOASalert","webDir":".","bundledWebRuntime":false}' > capacitor.config.json && cat capacitor.config.json
-      - name: Add Android limpio
+      - name: Crear www y config
+        run: |
+          mkdir -p www
+          cp index.html www/ 2>/dev/null || echo "<html><body><h1>GOASalert</h1></body></html>" > www/index.html
+          cp -r *.js *.css *.json manifest* www/ 2>/dev/null || true
+          echo '{"appId":"com.institutogoas.goasalert","appName":"GOASalert","webDir":"www","bundledWebRuntime":false}' > capacitor.config.json
+          cat capacitor.config.json
+          ls -la www/
+      - name: Add Android
         run: npx cap add android
-      - name: Copy y Sync
-        run: npx cap copy android && npx cap sync android
+      - name: Copy
+        run: npx cap copy android
       - name: Build AAB
         run: cd android && chmod +x gradlew &&./gradlew bundleRelease
       - name: Guardar AAB
