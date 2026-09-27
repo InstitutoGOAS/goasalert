@@ -1,30 +1,47 @@
-name: Build AAB
-on: [workflow_dispatch]
+name: Build GOASalert AAB - API36 v4
+
+on: [workflow_dispatch, push]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-      - name: Crear keystore fijo
+
+      - name: Crear App Android desde HTML
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > goasalert.keystore || keytool -genkey -v -keystore goasalert.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass goasalert123 -keypass goasalert123 -dname "CN=GOASalert, OU=GOAS, O=Instituto GOAS, L=Reus, S=Tarragona, C=ES"
-          keytool -export -rfc -keystore goasalert.keystore -alias upload -storepass goasalert123 -file upload_certificate.pem
-          flutter pub get
-          flutter build appbundle --release --build-number=${{ github.run_number }} --build-name=1.2 --no-tree-shake-icons -v
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          mkdir -p www
+          cp index.html www/index.html
+          echo '{"appId":"com.institutogoas.goasalert","appName":"GOASalert","webDir":"www"}' > capacitor.config.json
+          npx cap add android
+
+      - name: Poner API 36 y version 4
+        run: |
+          sed -i 's/compileSdk.*/compileSdk 36/' android/app/build.gradle
+          sed -i 's/targetSdk.*/targetSdk 36/' android/app/build.gradle
+          sed -i 's/versionCode.*/versionCode 4/' android/app/build.gradle
+          sed -i 's/versionName.*/versionName "4.0"/' android/app/build.gradle
+          # Crear keystore para firmar
+          keytool -genkey -v -keystore android/app/goasalert.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass goasalert123 -keypass goasalert123 -dname "CN=GOAS"
+
+      - name: Build AAB
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease -Pandroid.injected.signing.store.file=app/goasalert.keystore -Pandroid.injected.signing.store.password=goasalert123 -Pandroid.injected.signing.key.alias=upload -Pandroid.injected.signing.key.password=goasalert123
+
       - uses: actions/upload-artifact@v4
         with:
-          name: goasalert-aab-firmado
-          path: build/app/outputs/bundle/release/app-release.aab
-      - uses: actions/upload-artifact@v4
-        with:
-          name: goasalert-keystore-y-pem
-          path: |
-            goasalert.keystore
-            upload_certificate.pem
+          name: GOASalert-AAB-API36-v4-FIRMADO
+          path: android/app/build/outputs/bundle/release/*.aab
