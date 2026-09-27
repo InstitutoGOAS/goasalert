@@ -1,47 +1,36 @@
 name: Build GOASalert AAB - API36 v4
-
 on: [workflow_dispatch, push]
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
       - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          
+        with: { node-version: '20' }
       - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Crear App Android desde HTML
-        run: |
-          npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          mkdir -p www
-          cp index.html www/index.html
-          echo '{"appId":"com.institutogoas.goasalert","appName":"GOASalert","webDir":"www"}' > capacitor.config.json
-          npx cap add android
-
-      - name: Poner API 36 y version 4
-        run: |
-          sed -i 's/compileSdk.*/compileSdk 36/' android/app/build.gradle
-          sed -i 's/targetSdk.*/targetSdk 36/' android/app/build.gradle
-          sed -i 's/versionCode.*/versionCode 4/' android/app/build.gradle
-          sed -i 's/versionName.*/versionName "4.0"/' android/app/build.gradle
-          # Crear keystore para firmar
-          keytool -genkey -v -keystore android/app/goasalert.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass goasalert123 -keypass goasalert123 -dname "CN=GOAS"
+        with: { distribution: 'temurin', java-version: '17' }
 
       - name: Build AAB
         run: |
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          mkdir -p www && cp index.html www/
+          echo '{"appId":"com.institutogoas.goasalert","appName":"GOASalert","webDir":"www"}' > capacitor.config.json
+          npx cap add android
           cd android
+          keytool -genkey -v -keystore app/goasalert.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass goasalert123 -keypass goasalert123 -dname "CN=GOAS, OU=GOAS, O=GOAS, L=Reus, S=Catalunya, C=ES"
+          # Inyectar firma en build.gradle
+          sed -i "s/compileSdk.*/compileSdk 36/" app/build.gradle
+          sed -i "s/targetSdk.*/targetSdk 36/" app/build.gradle
+          sed -i "s/versionCode.*/versionCode 4/" app/build.gradle
+          sed -i "s/versionName.*/versionName \"4.0\"/" app/build.gradle
+          # Añadir signingConfig
+          awk '/buildTypes/{print "    signingConfigs {\n        release {\n            storeFile file(\"goasalert.keystore\")\n            storePassword \"goasalert123\"\n            keyAlias \"upload\"\n            keyPassword \"goasalert123\"\n        }\n    }";}1' app/build.gradle > tmp && mv tmp app/build.gradle
+          sed -i "s/release {/release {\n            signingConfig signingConfigs.release/" app/build.gradle
           chmod +x gradlew
-          ./gradlew bundleRelease -Pandroid.injected.signing.store.file=app/goasalert.keystore -Pandroid.injected.signing.store.password=goasalert123 -Pandroid.injected.signing.key.alias=upload -Pandroid.injected.signing.key.password=goasalert123
+          ./gradlew bundleRelease
 
       - uses: actions/upload-artifact@v4
         with:
-          name: GOASalert-AAB-API36-v4-FIRMADO
+          name: GOASalert-API36-v4-AAB
           path: android/app/build/outputs/bundle/release/*.aab
