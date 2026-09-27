@@ -7,33 +7,89 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: 'temurin', java-version: '17' }
-      - name: Build AAB
+      - name: Build AAB API36 v4
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0" > /dev/null
           rm -rf android
-          mkdir -p android/app/src/main/assets android/app/src/main/java/com/institutogoas/goasalert
+          mkdir -p android/app/src/main/assets
+          mkdir -p android/app/src/main/java/com/institutogoas/goasalert
           cp index.html android/app/src/main/assets/index.html
-          echo "include ':app'" > android/settings.gradle
-          echo "buildscript{repositories{google();mavenCentral()}dependencies{classpath 'com.android.tools.build:gradle:8.2.2'}}allprojects{repositories{google();mavenCentral()}}" > android/build.gradle
-          cat > android/app/build.gradle << 'EOF'
-          plugins { id 'com.android.application' }
-          android { namespace 'com.institutogoas.goasalert'; compileSdk 36
-            defaultConfig { applicationId "com.institutogoas.goasalert"; minSdk 22; targetSdk 36; versionCode 4; versionName "4.0" }
-            signingConfigs { release { storeFile file('goasalert.keystore'); storePassword 'goasalert123'; keyAlias 'upload'; keyPassword 'goasalert123' } }
-            buildTypes { release { signingConfig signingConfigs.release; minifyEnabled false } } }
-          dependencies { implementation 'androidx.appcompat:appcompat:1.6.1' }
-          EOF
-          cat > android/app/src/main/java/com/institutogoas/goasalert/MainActivity.java << 'EOF'
-          package com.institutogoas.goasalert;
-          import android.app.Activity; import android.os.Bundle; import android.webkit.WebView; import android.webkit.WebViewClient;
-          public class MainActivity extends Activity {
-            protected void onCreate(Bundle b){super.onCreate(b);WebView w=new WebView(this);w.getSettings().setJavaScriptEnabled(true);w.getSettings().setDomStorageEnabled(true);w.setWebViewClient(new WebViewClient());w.loadUrl("file:///android_asset/index.html");setContentView(w);}
+          cat > android/settings.gradle << 'SET'
+          include ':app'
+          SET
+          cat > android/build.gradle << 'ROOT'
+          buildscript {
+              repositories { google(); mavenCentral() }
+              dependencies { classpath 'com.android.tools.build:gradle:8.2.2' }
           }
-          EOF
-          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.INTERNET"/><application android:allowBackup="false" android:label="GOASalert" android:theme="@android:style/Theme.NoTitleBar"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>
-          EOF
-          cd android; keytool -genkey -v -keystore app/goasalert.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass goasalert123 -keypass goasalert123 -dname "CN=GOASalert" > /dev/null
-          gradle wrapper --gradle-version 8.5; chmod +x gradlew; ./gradlew :app:bundleRelease --no-daemon
+          allprojects { repositories { google(); mavenCentral() } }
+          ROOT
+          cat > android/app/build.gradle << 'APP'
+          plugins { id 'com.android.application' }
+          android {
+            namespace 'com.institutogoas.goasalert'
+            compileSdk 36
+            defaultConfig {
+              applicationId "com.institutogoas.goasalert"
+              minSdk 22
+              targetSdk 36
+              versionCode 4
+              versionName "4.0"
+            }
+            signingConfigs {
+              release {
+                storeFile file('goasalert.keystore')
+                storePassword 'goasalert123'
+                keyAlias 'upload'
+                keyPassword 'goasalert123'
+              }
+            }
+            buildTypes {
+              release {
+                signingConfig signingConfigs.release
+                minifyEnabled false
+              }
+            }
+          }
+          dependencies { implementation 'androidx.appcompat:appcompat:1.6.1' }
+          APP
+          cat > android/app/src/main/java/com/institutogoas/goasalert/MainActivity.java << 'JAVA'
+          package com.institutogoas.goasalert;
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          public class MainActivity extends Activity {
+            protected void onCreate(Bundle b){
+              super.onCreate(b);
+              WebView w=new WebView(this);
+              w.getSettings().setJavaScriptEnabled(true);
+              w.getSettings().setDomStorageEnabled(true);
+              w.setWebViewClient(new WebViewClient());
+              w.loadUrl("file:///android_asset/index.html");
+              setContentView(w);
+            }
+          }
+          JAVA
+          cat > android/app/src/main/AndroidManifest.xml << 'MAN'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.INTERNET"/>
+            <application android:allowBackup="false" android:label="GOASalert" android:theme="@android:style/Theme.NoTitleBar">
+              <activity android:name=".MainActivity" android:exported="true">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
+              </activity>
+            </application>
+          </manifest>
+          MAN
+          cd android
+          keytool -genkey -v -keystore app/goasalert.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass goasalert123 -keypass goasalert123 -dname "CN=GOASalert" > /dev/null
+          gradle wrapper --gradle-version 8.5
+          chmod +x gradlew
+          ./gradlew :app:bundleRelease --no-daemon --stacktrace
+
       - uses: actions/upload-artifact@v4
-        with: { name: GOASalert-API36-v4-FINAL, path: android/app/build/outputs/bundle/release/*.aab }
+        with:
+          name: GOASalert-API36-v4-FINAL
+          path: android/app/build/outputs/bundle/release/*.aab
