@@ -10,39 +10,43 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: 'temurin', java-version: '17' }
 
-      - name: Limpiar y crear Android
+      - name: Crear proyecto
         run: |
-          rm -rf android www node_modules package-lock.json
-          npm init -y
+          rm -rf android www
+          npm init -y > /dev/null
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          mkdir -p www
-          cp index.html www/index.html
-          echo '{"appId":"com.institutogoas.goasalert","appName":"GOASalert","webDir":"www","bundledWebRuntime":false}' > capacitor.config.json
+          mkdir www && cp index.html www/
+          echo '{"appId":"com.institutogoas.goasalert","appName":"GOASalert","webDir":"www"}' > capacitor.config.json
           npx cap add android
-          echo "Limpieza OK"
 
-      - name: API 36 + v4 + Firma
+      - name: Fix API36 + Version 4 + Firma
         run: |
           cd android
-          keytool -genkey -v -keystore app/goasalert.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass goasalert123 -keypass goasalert123 -dname "CN=GOAS"
-          sed -i 's/compileSdk.*/compileSdk 36/' app/build.gradle
-          sed -i 's/targetSdk.*/targetSdk 36/' app/build.gradle
-          sed -i 's/versionCode.*/versionCode 4/' app/build.gradle
-          sed -i 's/versionName.*/versionName "4.0"/' app/build.gradle
-          # Añadir firma
-          printf "\nandroid {\n  signingConfigs {\n    release {\n      storeFile file('goasalert.keystore')\n      storePassword 'goasalert123'\n      keyAlias 'upload'\n      keyPassword 'goasalert123'\n    }\n  }\n}\n" >> app/build.gradle
-          # Esto lo enlaza al release - lo hacemos con python para no fallar
-          python3 -c "
-          import pathlib
-          p=pathlib.Path('app/build.gradle').read_text()
-          p=p.replace('buildTypes {', 'buildTypes {\n        release {\n            signingConfig signingConfigs.release\n        }')
-          # si ya existe otro release, lo limpia
-          pathlib.Path('app/build.gradle').write_text(p)
-          "
+          keytool -genkey -v -keystore app/goasalert.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass goasalert123 -keypass goasalert123 -dname "CN=GOAS" > /dev/null
+          
+          python3 << 'PY'
+          import re, pathlib
+          path = pathlib.Path("app/build.gradle")
+          text = path.read_text()
+          # API 36 y v4
+          text = re.sub(r'compileSdk.*', 'compileSdk 36', text)
+          text = re.sub(r'targetSdk.*', 'targetSdk 36', text)
+          text = re.sub(r'versionCode.*', 'versionCode 4', text)
+          text = re.sub(r'versionName.*', 'versionName "4.0"', text)
+          # Añadir signingConfigs dentro de android {
+          if "goasalert.keystore" not in text:
+              text = text.replace("android {", "android {\n    signingConfigs {\n        release {\n            storeFile file('goasalert.keystore')\n            storePassword 'goasalert123'\n            keyAlias 'upload'\n            keyPassword 'goasalert123'\n        }\n    }")
+          # Hacer que release use esa firma
+          if "signingConfig signingConfigs.release" not in text:
+              text = text.replace("buildTypes {\n        release {", "buildTypes {\n        release {\n            signingConfig signingConfigs.release")
+          path.write_text(text)
+          print("build.gradle arreglado")
+          PY
+          
           chmod +x gradlew
           ./gradlew bundleRelease
 
       - uses: actions/upload-artifact@v4
         with:
-          name: GOASalert-API36-v4-FINAL
+          name: GOASalert-API36-v4-LISTO
           path: android/app/build/outputs/bundle/release/*.aab
