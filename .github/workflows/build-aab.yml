@@ -9,20 +9,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
-        with: { distribution: 'temurin', java-version: '17' }
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Instalar Android SDK 36
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platforms;android-35"
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --list | grep 36
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          echo "SDK 36 instalado"
 
-      - uses: gradle/actions/setup-gradle@v3
-        with: { gradle-version: '8.7' }
-
-      - name: Crear proyecto Android API36 v4
+      - name: Crear proyecto y Build sin cache
         run: |
-          rm -rf android
+          rm -rf android ~/.gradle
           mkdir -p android/app/src/main/assets
           mkdir -p android/app/src/main/java/com/institutogoas/goasalert
           cp index.html android/app/src/main/assets/index.html
@@ -34,7 +34,7 @@ jobs:
           cat > android/build.gradle << 'EOF'
           buildscript {
             repositories { google(); mavenCentral() }
-            dependencies { classpath 'com.android.tools.build:gradle:8.6.0' }
+            dependencies { classpath 'com.android.tools.build:gradle:8.2.2' }
           }
           allprojects { repositories { google(); mavenCentral() } }
           EOF
@@ -44,7 +44,6 @@ jobs:
           android {
             namespace 'com.institutogoas.goasalert'
             compileSdk 36
-            buildToolsVersion "36.0.0"
             defaultConfig {
               applicationId "com.institutogoas.goasalert"
               minSdk 22
@@ -64,7 +63,6 @@ jobs:
               release {
                 signingConfig signingConfigs.release
                 minifyEnabled false
-                shrinkResources false
               }
             }
           }
@@ -73,10 +71,7 @@ jobs:
 
           cat > android/app/src/main/java/com/institutogoas/goasalert/MainActivity.java << 'EOF'
           package com.institutogoas.goasalert;
-          import android.app.Activity;
-          import android.os.Bundle;
-          import android.webkit.WebView;
-          import android.webkit.WebViewClient;
+          import android.app.Activity; import android.os.Bundle; import android.webkit.WebView; import android.webkit.WebViewClient;
           public class MainActivity extends Activity {
             protected void onCreate(Bundle b){
               super.onCreate(b);
@@ -101,9 +96,11 @@ jobs:
 
           cd android
           keytool -genkey -v -keystore app/goasalert.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass goasalert123 -keypass goasalert123 -dname "CN=GOASalert" > /dev/null
-          gradle :app:bundleRelease --stacktrace
+          gradle wrapper --gradle-version 8.5
+          chmod +x gradlew
+         ./gradlew :app:bundleRelease --no-daemon --no-configuration-cache
 
       - uses: actions/upload-artifact@v4
         with:
-          name: GOASalert-API36-v4-AAB-FINAL
+          name: GOASalert-API36-v4-FINAL
           path: android/app/build/outputs/bundle/release/*.aab
