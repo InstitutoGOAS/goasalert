@@ -10,43 +10,30 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: 'temurin', java-version: '17' }
 
-      - name: Crear proyecto
+      - name: Crear App
         run: |
-          rm -rf android www
-          npm init -y > /dev/null
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          mkdir www && cp index.html www/
+          rm -rf android www node_modules
+          npm init -y
+          npm i @capacitor/core @capacitor/cli @capacitor/android
+          mkdir -p www && cp index.html www/index.html
           echo '{"appId":"com.institutogoas.goasalert","appName":"GOASalert","webDir":"www"}' > capacitor.config.json
           npx cap add android
 
-      - name: Fix API36 + Version 4 + Firma
+      - name: Build AAB API36 v4
         run: |
           cd android
-          keytool -genkey -v -keystore app/goasalert.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass goasalert123 -keypass goasalert123 -dname "CN=GOAS" > /dev/null
-          
-          python3 << 'PY'
-          import re, pathlib
-          path = pathlib.Path("app/build.gradle")
-          text = path.read_text()
-          # API 36 y v4
-          text = re.sub(r'compileSdk.*', 'compileSdk 36', text)
-          text = re.sub(r'targetSdk.*', 'targetSdk 36', text)
-          text = re.sub(r'versionCode.*', 'versionCode 4', text)
-          text = re.sub(r'versionName.*', 'versionName "4.0"', text)
-          # Añadir signingConfigs dentro de android {
-          if "goasalert.keystore" not in text:
-              text = text.replace("android {", "android {\n    signingConfigs {\n        release {\n            storeFile file('goasalert.keystore')\n            storePassword 'goasalert123'\n            keyAlias 'upload'\n            keyPassword 'goasalert123'\n        }\n    }")
-          # Hacer que release use esa firma
-          if "signingConfig signingConfigs.release" not in text:
-              text = text.replace("buildTypes {\n        release {", "buildTypes {\n        release {\n            signingConfig signingConfigs.release")
-          path.write_text(text)
-          print("build.gradle arreglado")
-          PY
+          # Forzar API 36 y version 4 en todos los gradle
+          find . -name "build.gradle" -exec sed -i 's/compileSdkVersion.*/compileSdkVersion 36/' {} \;
+          find . -name "build.gradle" -exec sed -i 's/compileSdk.*/compileSdk 36/' {} \;
+          find . -name "build.gradle" -exec sed -i 's/targetSdkVersion.*/targetSdkVersion 36/' {} \;
+          find . -name "build.gradle" -exec sed -i 's/targetSdk.*/targetSdk 36/' {} \;
+          sed -i 's/versionCode.*/versionCode 4/' app/build.gradle
+          sed -i 's/versionName.*/versionName "4.0"/' app/build.gradle
           
           chmod +x gradlew
-          ./gradlew bundleRelease
+          ./gradlew bundleRelease --stacktrace
 
       - uses: actions/upload-artifact@v4
         with:
-          name: GOASalert-API36-v4-LISTO
-          path: android/app/build/outputs/bundle/release/*.aab
+          name: GOASalert-API36-v4-AAB
+          path: android/app/build/outputs/bundle/release/app-release.aab
