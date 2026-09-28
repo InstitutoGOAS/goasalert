@@ -1,80 +1,65 @@
-name: Build GOASalert AAB - API36 FIX KEY v5.2
-on: workflow_dispatch
+name: build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Setup Android SDK
-        run: |
-          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
-          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        uses: android-actions/setup-android@v3
 
-      - name: Build AAB
-        run: |
-          rm -rf android
-          mkdir -p android/app/src/main/assets android/app/src/main/java/com/institutogoas/goasalert
-          cp index.html android/app/src/main/assets/ || echo "<html><body>GOAS</body></html>" > android/app/src/main/assets/index.html
-          echo "include ':app'" > android/settings.gradle
-          echo "android.useAndroidX=true" > android/gradle.properties
-          echo "buildscript{repositories{google();mavenCentral()}dependencies{classpath 'com.android.tools.build:gradle:8.6.0'}}allprojects{repositories{google();mavenCentral()}}" > android/build.gradle
-          cat > android/app/build.gradle << 'GRADLE'
-          plugins { id 'com.android.application' }
-          android {
-            namespace 'com.institutogoas.goasalert'
-            compileSdk 36
-            defaultConfig { applicationId "com.institutogoas.goasalert"; minSdk 22; targetSdk 36; versionCode 5; versionName "5.0" }
-            signingConfigs { release { storeFile file('goasalert-final.keystore'); storePassword 'goasalert123'; keyAlias 'upload'; keyPassword 'goasalert123' } }
-            buildTypes { release { signingConfig signingConfigs.release; minifyEnabled false } }
-          }
-          dependencies { implementation 'androidx.appcompat:appcompat:1.6.1' }
-          GRADLE
-          cat > android/app/src/main/java/com/institutogoas/goasalert/MainActivity.java << 'JAVA'
-          package com.institutogoas.goasalert;
-          import android.app.Activity;
-          import android.os.Bundle;
-          import android.webkit.WebView;
-          import android.webkit.WebViewClient;
-          public class MainActivity extends Activity {
-            protected void onCreate(Bundle b) {
-              super.onCreate(b);
-              WebView w=new WebView(this);
-              w.getSettings().setJavaScriptEnabled(true);
-              w.getSettings().setDomStorageEnabled(true);
-              w.setWebViewClient(new WebViewClient());
-              w.loadUrl("file:///android_asset/index.html");
-              setContentView(w);
-            }
-          }
-          JAVA
-          cat > android/app/src/main/AndroidManifest.xml << 'MANI'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-            <uses-permission android:name="android.permission.INTERNET"/>
-            <application android:allowBackup="false" android:label="GOASalert" android:theme="@android:style/Theme.NoTitleBar">
-              <activity android:name=".MainActivity" android:exported="true">
-                <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
-              </activity>
-            </application>
-          </manifest>
-          MANI
-          cd android
-          keytool -genkey -v -keystore app/goasalert-final.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass goasalert123 -keypass goasalert123 -dname "CN=GOAS Final"
-          wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
-          unzip -q gradle-8.7-bin.zip
-          ./gradle-8.7/bin/gradle wrapper --gradle-version 8.7
-          chmod +x gradlew
-          ./gradlew :app:bundleRelease --no-daemon
-          keytool -export -rfc -keystore app/goasalert-final.keystore -alias upload -storepass goasalert123 -file app/upload_certificate.pem
+      - name: Install dependencies
+        run: npm ci
 
-      - uses: actions/upload-artifact@v4
+      - name: Build web app
+        run: npm run build
+        # si usas ionic: npx ionic build
+
+      - name: Add and Sync Android
+        run: |
+          npx cap add android || true
+          npx cap sync android
+
+      - name: Generate Keystore
+        run: |
+          mkdir -p app
+          keytool -genkey -v -keystore app/goasalert-final.keystore -alias goas-final -keyalg RSA -keysize 2048 -validity 10000 -storepass ${{ secrets.KEYSTORE_PASSWORD || 'goas123456' }} -keypass ${{ secrets.KEY_PASSWORD || 'goas123456' }} -dname "CN=GOAS Final, OU=GOAS, O=GOAS, L=Reus, S=Catalunya, C=ES"
+          # Si ya tienes keystore en Secrets, usa este en vez de generar:
+          # echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/goasalert-final.keystore
+        working-directory: android
+
+      - name: Create keystore.properties
+        run: |
+          echo "storeFile=goasalert-final.keystore" > keystore.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD || 'goas123456' }}" >> keystore.properties
+          echo "keyAlias=goas-final" >> keystore.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD || 'goas123456' }}" >> keystore.properties
+        working-directory: android
+
+      - name: Build AAB Release
+        run:./gradlew bundleRelease --no-daemon --stacktrace
+        working-directory: android
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
         with:
-          name: GOASalert-v5.2-FIXED
-          path: |
-            android/app/build/outputs/bundle/release/*.aab
-            android/app/upload_certificate.pem
-            android/app/goasalert-final.keystore
+          name: goasalert-release.aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
